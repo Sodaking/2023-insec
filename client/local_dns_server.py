@@ -11,12 +11,12 @@ def load_certificate(certificate_file):
         certificate = crypto.load_certificate(crypto.FILETYPE_PEM, f.read())
     return crypto.dump_certificate(crypto.FILETYPE_PEM, certificate)
 
-def verify_signature(certificate, signature, data):
+def verify_signature(certificate, signature, data, algorithm):
     try:
         cert = crypto.load_certificate(crypto.FILETYPE_PEM, certificate)
         public_key = cert.get_pubkey()
         pub_key_string = crypto.dump_publickey(crypto.FILETYPE_PEM, public_key)
-        crypto.verify(cert, signature, data.encode(), "sha256")
+        crypto.verify(cert, signature, data.encode(), algorithm)
         return True
     except crypto.Error:
         return False
@@ -52,19 +52,24 @@ def resolve_domain(domain):
     return [record.to_text() for record in answer]
 
 class StubResolver:
-    def __init__(self, domain='www.naver.com', host='127.0.0.1', port=8080):
-    #def __init__(self, domain='www.naver.com', host='147.46.242.204', port=9990):
+    # def __init__(self, host='127.0.0.1', port=8080):
+    def __init__(self, domain='www.naver.com', host='147.46.242.204', port=9991):
         self.host = host
         self.port = port
         self.domain = domain
 
-    def start(self, index):
+    def start(self, algorithm='sha256', pki_type='none'):
         with socket.create_connection((self.host, self.port)) as sock:
             root_certificate = load_certificate(trusted_root_certificate)
-            message = f"{self.domain}:{index}"
-            sock.sendall(self.domain.encode())
-            data = sock.recv(4096).decode()
-
+            request = f"{self.domain}:{algorithm}:{pki_type}"
+            sock.sendall(request.encode())
+            data = sock.recv(4096)
+            data = data.decode()
+            print(data)
+            if pki_type == 'none':
+                Name, Ttl, Class, Type, Data = data.split(':')
+                return 'IP address: ' + Data
+                
             Name, Ttl, Class, Type, Data, Signature_base64, Certificate_base64 = data.split(':')
             ip, signature, certificate = Data, base64.b64decode(Signature_base64), base64.b64decode(Certificate_base64)
 
@@ -80,7 +85,7 @@ class StubResolver:
                 return 'Class does not match!'
             # print('Class verification OK')
 
-            if verify_signature(certificate, signature, ip) == False:
+            if verify_signature(certificate, signature, ip, algorithm) == False:
                 return 'Signature verification failed!'
             # print('Signature verification OK')
             
