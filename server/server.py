@@ -2,7 +2,7 @@ import socket
 from OpenSSL import crypto
 import random
 
-pki_list = ["domain", "domain2", "bad"]
+pki_list = ["certificates/domain", "certificates/domain2", "certificates/bad"]
 
 def create_signature(private_key_file, data):
     with open(private_key_file + ".key", "rt") as f:
@@ -28,22 +28,23 @@ class TCPServer:
             while True:
                 newsocket, fromaddr = sock.accept()
                 try:
-                    data = newsocket.recv(1024)
-                    ip = socket.gethostbyname(data).encode()
+                    domain = newsocket.recv(1024)
+                    ip = socket.gethostbyname(domain)
                     
                     #signing certificate choose
                     pki_idx = random.choice(range(len(pki_list)))
                     selected_pki = pki_list[pki_idx]
                     print('Signing Certificate: ' + selected_pki)
-                    signature = create_signature(selected_pki, ip)
+                    signature = create_signature(selected_pki, ip.encode())
 
                     #response certificate choose
                     pki_idx = random.choice(range(len(pki_list)))
                     selected_pki = pki_list[pki_idx]
                     certificate = load_certificate(selected_pki)
                     print('Delivered Certificate: ' + selected_pki)
+                    response = f"{domain} 300 IN A {ip}"
 
-                    response = ip + b'separator' + certificate + b'separator' + signature
+                    response = response.encode() + b'separator' + certificate + b'separator' + signature
                     newsocket.sendall(response)
                 finally:
                     newsocket.close()

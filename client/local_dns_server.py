@@ -1,8 +1,9 @@
 import socket
 import ssl
 from OpenSSL import crypto
+import dns.resolver
 
-trusted_root_certificate = "rootCA"
+trusted_root_certificate = "certificates/rootCA"
 
 def load_certificate(certificate_file):
     with open(certificate_file + ".crt", "rt") as f:
@@ -14,7 +15,8 @@ def verify_signature(certificate, signature, data):
         cert = crypto.load_certificate(crypto.FILETYPE_PEM, certificate)
         public_key = cert.get_pubkey()
         pub_key_string = crypto.dump_publickey(crypto.FILETYPE_PEM, public_key)
-        return crypto.verify(cert, signature, data, "sha256") == None
+        crypto.verify(cert, signature, data, "sha256")
+        return True
     except crypto.Error:
         return False
 
@@ -41,9 +43,14 @@ def verify_certificate_chain(certificate, trusted_cert_pem):
         print(f"Certificate chain Verification failed: {str(e)}")    
         return False
 
+def resolve_domain(domain):
+    resolver = dns.resolver.Resolver()
+    answer = resolver.resolve(domain, 'A')  # query for A records
+    return [record.to_text() for record in answer]
+
 class TCPClient:
-    #def __init__(self, host='127.0.0.1', port=8080):
-    def __init__(self, host='147.46.242.204', port=9990):
+    def __init__(self, host='127.0.0.1', port=8080):
+    #def __init__(self, host='147.46.242.204', port=9990):
         self.host = host
         self.port = port
 
@@ -51,20 +58,22 @@ class TCPClient:
         with socket.create_connection((self.host, self.port)) as sock:
             root_certificate = load_certificate(trusted_root_certificate)
             domain = 'www.naver.com'
-            sock.sendall(domain.encode())
-            
-            data = sock.recv(4096)
-            ip, certificate, signature = data.split(b'separator')
-            certificate2 = certificate
-            is_valid = verify_certificate_chain(certificate, root_certificate)
-            if is_valid == False:
-                return
-    
-            is_valid = verify_signature(certificate2, signature, ip)
-            if is_valid:
-                print('Signature verification OK: ' + ip.decode())
-            else:
-                print('The server is not legitimate!')
+            ip_address_list = resolve_domain(domain)
+
+            for ip_address in ip_address_list:
+                sock.sendall(domain.encode())
+                data = sock.recv(4096)
+                ip, certificate, signature = data.split(b'separator')
+                certificate2 = certificate
+                is_valid = verify_certificate_chain(certificate, root_certificate)
+                if is_valid == False:
+                    return
+        
+                is_valid = verify_signature(certificate2, signature, ip)
+                if is_valid:
+                    print('Signature verification OK: ' + ip.decode())
+                else:
+                    print('The server is not legitimate!')
 
 if __name__ == '__main__':
     client = TCPClient()
