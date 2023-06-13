@@ -3,7 +3,7 @@ from OpenSSL import crypto
 import random
 import base64
 
-pki_list = ["certificates/domain", "certificates/domain2", "certificates/bad"]
+pki_list = ["certificates/domain_ecc256", "certificates/domain", "certificates/domain_4096"]
 
 def create_signature(private_key_file, data):
     with open(private_key_file + ".key", "rt") as f:
@@ -16,8 +16,8 @@ def load_certificate(certificate_file):
     return crypto.dump_certificate(crypto.FILETYPE_PEM, certificate)
 
 class TCPServer:
-    #def __init__(self, host='127.0.0.1', port=8080):
-    def __init__(self, host='147.46.242.204', port=9990):
+    def __init__(self, host='127.0.0.1', port=8080):
+    #def __init__(self, host='147.46.242.204', port=9990):
         self.host = host
         self.port = port
 
@@ -29,19 +29,21 @@ class TCPServer:
             while True:
                 newsocket, fromaddr = sock.accept()
                 try:
-                    domain = newsocket.recv(1024).decode()
+                    data = newsocket.recv(1024).decode()
+                    domain, index = data.split(':')
+                    index = int(index)
                     ip = socket.gethostbyname(domain)
                     
                     #signing certificate choose
                     pki_idx = random.choice(range(len(pki_list)))
-                    selected_pki = pki_list[pki_idx]
+                    selected_pki = pki_list[index]
                     print('Signing Certificate: ' + selected_pki)
                     signature = create_signature(selected_pki, ip.encode())
                     signature_base64 = base64.b64encode(signature).decode()
 
                     #response certificate choose
                     pki_idx = random.choice(range(len(pki_list)))
-                    selected_pki = pki_list[pki_idx]
+                    selected_pki = pki_list[index]
                     print('Delivered Certificate: ' + selected_pki)
                     certificate = load_certificate(selected_pki)
                     certificate_base64 = base64.b64encode(certificate).decode()

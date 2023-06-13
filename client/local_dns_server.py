@@ -52,16 +52,16 @@ def resolve_domain(domain):
     return [record.to_text() for record in answer]
 
 class StubResolver:
-    # def __init__(self, host='127.0.0.1', port=8080):
-    def __init__(self, domain='www.naver.com', host='147.46.242.204', port=9990):
+    def __init__(self, domain='www.naver.com', host='127.0.0.1', port=8080):
+    #def __init__(self, domain='www.naver.com', host='147.46.242.204', port=9990):
         self.host = host
         self.port = port
         self.domain = domain
 
-    def start(self):
+    def start(self, index):
         with socket.create_connection((self.host, self.port)) as sock:
             root_certificate = load_certificate(trusted_root_certificate)
-
+            message = f"{self.domain}:{index}"
             sock.sendall(self.domain.encode())
             data = sock.recv(4096).decode()
 
