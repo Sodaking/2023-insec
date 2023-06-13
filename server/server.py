@@ -1,6 +1,7 @@
 import socket
 from OpenSSL import crypto
 import random
+import base64
 
 pki_list = ["certificates/domain", "certificates/domain2", "certificates/bad"]
 
@@ -28,7 +29,7 @@ class TCPServer:
             while True:
                 newsocket, fromaddr = sock.accept()
                 try:
-                    domain = newsocket.recv(1024)
+                    domain = newsocket.recv(1024).decode()
                     ip = socket.gethostbyname(domain)
                     
                     #signing certificate choose
@@ -36,16 +37,18 @@ class TCPServer:
                     selected_pki = pki_list[pki_idx]
                     print('Signing Certificate: ' + selected_pki)
                     signature = create_signature(selected_pki, ip.encode())
+                    signature_base64 = base64.b64encode(signature).decode()
 
                     #response certificate choose
                     pki_idx = random.choice(range(len(pki_list)))
                     selected_pki = pki_list[pki_idx]
-                    certificate = load_certificate(selected_pki)
                     print('Delivered Certificate: ' + selected_pki)
-                    response = f"{domain} 300 IN A {ip}"
+                    certificate = load_certificate(selected_pki)
+                    certificate_base64 = base64.b64encode(certificate).decode()
 
-                    response = response.encode() + b'separator' + certificate + b'separator' + signature
+                    response = f"{domain}:3600:IN:A:{ip}:{signature_base64}:{certificate_base64}".encode()
                     newsocket.sendall(response)
+                    
                 finally:
                     newsocket.close()
 

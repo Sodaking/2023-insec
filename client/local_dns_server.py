@@ -2,6 +2,7 @@ import socket
 import ssl
 from OpenSSL import crypto
 import dns.resolver
+import base64
 
 trusted_root_certificate = "certificates/rootCA"
 
@@ -15,7 +16,7 @@ def verify_signature(certificate, signature, data):
         cert = crypto.load_certificate(crypto.FILETYPE_PEM, certificate)
         public_key = cert.get_pubkey()
         pub_key_string = crypto.dump_publickey(crypto.FILETYPE_PEM, public_key)
-        crypto.verify(cert, signature, data, "sha256")
+        crypto.verify(cert, signature, data.encode(), "sha256")
         return True
     except crypto.Error:
         return False
@@ -37,45 +38,59 @@ def verify_certificate_chain(certificate, trusted_cert_pem):
     # Verify the certificate, returns None if successful, raises exception otherwise
     try:
         store_ctx.verify_certificate()
-        print("Certificate chain is valid")
+        # print("Certificate chain is valid")
         return True
     except Exception as e:
-        print(f"Certificate chain Verification failed: {str(e)}")    
+        # print(f"Certificate chain Verification failed: {str(e)}")    
         return False
 
 def resolve_domain(domain):
     resolver = dns.resolver.Resolver()
     answer = resolver.resolve(domain, 'A')  # query for A records
+    for rec in answer:
+        print(rec)
     return [record.to_text() for record in answer]
 
-class TCPClient:
-    def __init__(self, host='127.0.0.1', port=8080):
-    #def __init__(self, host='147.46.242.204', port=9990):
+class StubResolver:
+    # def __init__(self, host='127.0.0.1', port=8080):
+    def __init__(self, domain='www.naver.com', host='147.46.242.204', port=9990):
         self.host = host
         self.port = port
+        self.domain = domain
 
     def start(self):
         with socket.create_connection((self.host, self.port)) as sock:
             root_certificate = load_certificate(trusted_root_certificate)
-            domain = 'www.naver.com'
-            ip_address_list = resolve_domain(domain)
 
-            for ip_address in ip_address_list:
-                sock.sendall(domain.encode())
-                data = sock.recv(4096)
-                ip, certificate, signature = data.split(b'separator')
-                certificate2 = certificate
-                is_valid = verify_certificate_chain(certificate, root_certificate)
-                if is_valid == False:
-                    return
-        
-                is_valid = verify_signature(certificate2, signature, ip)
-                if is_valid:
-                    print('Signature verification OK: ' + ip.decode())
-                else:
-                    print('The server is not legitimate!')
+            sock.sendall(self.domain.encode())
+            data = sock.recv(4096).decode()
+
+            Name, Ttl, Class, Type, Data, Signature_base64, Certificate_base64 = data.split(':')
+            ip, signature, certificate = Data, base64.b64decode(Signature_base64), base64.b64decode(Certificate_base64)
+
+            if Name != self.domain:
+                return 'Domain name does not match!'
+            # print('Domain name verification OK')
+
+            if Type != 'A':
+                return 'Type does not match!'
+            # print('Type verification OK')
+
+            if Class != 'IN':
+                return 'Class does not match!'
+            # print('Class verification OK')
+
+            if verify_signature(certificate, signature, ip) == False:
+                return 'Signature verification failed!'
+            # print('Signature verification OK')
+            
+            if verify_certificate_chain(certificate, root_certificate) == False:
+                return 'Certificate chain is not valid!'
+            # print('Certificate chain verification OK')
+            
+            return 'IP address: ' + ip
 
 if __name__ == '__main__':
-    client = TCPClient()
+    client = StubResolver(domain='www.naver.com')
     client.start()
 
