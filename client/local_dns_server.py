@@ -47,8 +47,8 @@ def verify_certificate_chain(certificate, trusted_cert_pem):
 def resolve_domain(domain):
     resolver = dns.resolver.Resolver()
     answer = resolver.resolve(domain, 'A')  # query for A records
-    for rec in answer:
-        print(rec)
+    # for rec in answer:
+    #     print(rec)
     return [record.to_text() for record in answer]
 
 class StubResolver:
@@ -65,13 +65,13 @@ class StubResolver:
             sock.sendall(request.encode())
             data = sock.recv(4096)
             data = data.decode()
-            print(data)
+            # print(data)
             if pki_type == 'none':
                 Name, Ttl, Class, Type, Data = data.split(':')
                 return 'IP address: ' + Data
                 
             Name, Ttl, Class, Type, Data, Signature_base64, Certificate_base64 = data.split(':')
-            ip, signature, certificate = Data, base64.b64decode(Signature_base64), base64.b64decode(Certificate_base64)
+            ip, signature, certificate = Data, base64.b64decode(Signature_base64 + '=' * (-len(Signature_base64) % 4)), base64.b64decode(Certificate_base64 + '=' * (-len(Certificate_base64) % 4))
 
             if Name != self.domain:
                 return 'Domain name does not match!'

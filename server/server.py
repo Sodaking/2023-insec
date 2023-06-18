@@ -46,7 +46,7 @@ class TCPServer:
                             selected_pki = pki_list[pki_idx]
                         else:
                             selected_pki = pki_type
-                        print('Signing Certificate: ' + selected_pki)
+                        # print('Signing Certificate: ' + selected_pki)
                         signature = create_signature(selected_pki, ip.encode(), algorithm)
                         signature_base64 = base64.b64encode(signature).decode()
 
@@ -56,7 +56,7 @@ class TCPServer:
                             selected_pki = pki_list[pki_idx]
                         else:
                             selected_pki = pki_type
-                        print('Delivered Certificate: ' + selected_pki)
+                        # print('Delivered Certificate: ' + selected_pki)
                         certificate = load_certificate(selected_pki)
                         certificate_base64 = base64.b64encode(certificate).decode()
 
